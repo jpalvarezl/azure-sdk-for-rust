@@ -5,11 +5,11 @@ use std::collections::HashMap;
 pub struct CreateChatCompletionsRequest {
     pub messages: Vec<ChatCompletionRequestMessage>,
     pub model: String,
-    pub frequency_penalty: f64,
-    pub logit_bias: Option<HashMap<String, f64>>,
-    pub logprobs: Option<bool>,
-    pub top_logprobs: Option<i32>,
-    pub max_tokens: Option<i32>,
+    // pub frequency_penalty: f64,
+    // pub logit_bias: Option<HashMap<String, f64>>,
+    // pub logprobs: Option<bool>,
+    // pub top_logprobs: Option<i32>,
+    // pub max_tokens: Option<i32>,
 }
 
 #[derive(Serialize, Debug, Clone, Default)]
@@ -45,15 +45,10 @@ impl ChatCompletionRequestMessage {
     
 }
 impl CreateChatCompletionsRequest {
-    pub fn new(prompt: &str) -> Self {
-        Self {
-            model: prompt.to_string(),
-            ..Default::default()
-        }
-    }
 
-    pub fn new_with_user_message(prompt: &str) -> Self {
+    pub fn new_with_user_message(model: &str, prompt: &str) -> Self {
         Self {
+            model: model.to_string(),
             messages: vec![ChatCompletionRequestMessage::new_user(prompt)],
             ..Default::default()
         }
