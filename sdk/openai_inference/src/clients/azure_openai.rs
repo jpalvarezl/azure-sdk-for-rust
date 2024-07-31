@@ -1,4 +1,4 @@
-use crate::CreateChatCompletionsOptions;
+use crate::CreateChatCompletionsRequest;
 
 pub struct AzureOpenAIClient {
     endpoint: String,
@@ -14,7 +14,7 @@ impl AzureOpenAIClient {
         }
     }
 
-    pub fn get_chat_completions(chat_completions_options: &CreateChatCompletionsOptions) -> String {
-        format!("AzureOpenAIClient.get_chat_completions {}", chat_completions_options.prompt)
+    pub fn create_chat_completions(chat_completions_request: &CreateChatCompletionsRequest) -> String {
+        format!("AzureOpenAIClient.get_chat_completions {:#?}", chat_completions_request.messages.get(0))
     }
 }
