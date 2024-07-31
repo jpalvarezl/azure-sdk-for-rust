@@ -1,15 +1,23 @@
-use azure_openai_inference::{AzureOpenAIClient, CreateChatCompletionsRequest};
+use azure_openai_inference::{CreateChatCompletionsRequest};
+use azure_openai_inference::OpenAIClient;
 
-fn main() {
+#[tokio::main]
+async fn main() {
+    let secret = std::env::var("NON_AZURE_OPENAI_KEY=").expect("Set NON_AZURE_OPENAI_KEY= env variable");
 
-    let endpoint = std::env::var("AZURE_OPENAI_ENDPOINT").expect("Set AZURE_OPENAI_ENDPOINT env variable");
-    let key = std::env::var("AZURE_OPENAI_KEY").expect("Set AZURE_OPENAI_KEY env variable");
+    let openai_client = OpenAIClient::new(secret);
 
-    let chat_completion_request = CreateChatCompletionsRequest::new_with_user_message("Tell me a joke about pineapples");
-    let chat_completions = AzureOpenAIClient::create_chat_completions(
-        &chat_completion_request
-    );
+    let chat_completions_request = CreateChatCompletionsRequest::new_with_user_message("Tell me a joke about pineapples");
+    let response = openai_client.create_chat_completions(
+        &chat_completions_request
+    ).await;
 
-    println!("{:#?}", serde_json::to_string(&chat_completion_request).unwrap());
-    println!("Response: {}", chat_completions);
+    match response {
+        Ok(chat_completions) => {
+            println!("{:#?}", &chat_completions);
+        }
+        Err(e) => {
+            println!("Error: {}", e);
+        }
+    }
 }
