@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use azure_core::{HttpClient, Method, Url};
+use azure_core::{Result, HttpClient, Method, Url};
 
 use crate::auth::OpenAIKeyCredential;
 use crate::{CreateChatCompletionsRequest, CreateChatCompletionsResponse};
@@ -20,12 +20,10 @@ impl OpenAIClient {
     }
 
     pub async fn create_chat_completions(&self, chat_completions_request: &CreateChatCompletionsRequest) 
-    -> azure_core::Result<CreateChatCompletionsResponse> {
+    -> Result<CreateChatCompletionsResponse> {
         let url = Url::parse("https://api.openai.com/v1/chat/completions")?;
         let request  = super::build_request(&self.key_credential, url, Method::Post, chat_completions_request)?;
-
         let response = self.http_client.execute_request(&request).await?;
-
         response.json::<CreateChatCompletionsResponse>().await
     }
 }
