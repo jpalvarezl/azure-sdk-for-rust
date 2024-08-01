@@ -1,4 +1,4 @@
-use azure_openai_inference::{CreateChatCompletionsRequest};
+use azure_openai_inference::CreateChatCompletionsRequest;
 use azure_openai_inference::OpenAIClient;
 
 #[tokio::main]
