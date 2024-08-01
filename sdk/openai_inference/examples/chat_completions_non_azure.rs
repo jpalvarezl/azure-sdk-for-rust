@@ -4,7 +4,7 @@ use azure_openai_inference::OpenAIKeyCredential;
 
 #[tokio::main]
 async fn main() {
-    let secret = std::env::var("NON_AZURE_OPENAI_KEY=").expect("Set NON_AZURE_OPENAI_KEY= env variable");
+    let secret = std::env::var("NON_AZURE_OPENAI_KEY").expect("Set NON_AZURE_OPENAI_KEY env variable");
 
     let openai_client = OpenAIClient::new(OpenAIKeyCredential::new(secret));
 
