@@ -8,10 +8,10 @@ async fn main() {
     let openai_client = OpenAIClient::new(secret);
 
     let chat_completions_request = CreateChatCompletionsRequest::new_with_user_message(
-        "gpt-4-1106-preview",
+        "gpt-3.5-turbo-1106",
         "Tell me a joke about pineapples");
 
-    println!("{:#?}", serde_json::to_string(&chat_completions_request).unwrap());
+    println!("{:#?}", &chat_completions_request);
     let response = openai_client.create_chat_completions(
         &chat_completions_request
     ).await;

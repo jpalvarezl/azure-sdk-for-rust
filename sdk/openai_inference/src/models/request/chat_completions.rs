@@ -14,6 +14,7 @@ pub struct CreateChatCompletionsRequest {
 
 #[derive(Serialize, Debug, Clone, Default)]
 pub struct ChatCompletionRequestMessageBase {
+    #[serde(skip)]
     pub name: Option<String>,
     pub content: String, // TODO this should be either a string or ChatCompletionRequestMessageContentPart (a polymorphic type)
 }
