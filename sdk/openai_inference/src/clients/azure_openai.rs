@@ -1,16 +1,16 @@
-use crate::CreateChatCompletionsRequest;
+use crate::{AzureKeyCredential, CreateChatCompletionsRequest};
 
 pub struct AzureOpenAIClient {
     endpoint: String,
-    service_version: String,
+    key_credential: AzureKeyCredential,
 }
 
 impl AzureOpenAIClient {
 
-    pub fn new(endpoint: String, service_version: String) -> Self {
+    pub fn new(endpoint: String, key_credential: AzureKeyCredential) -> Self {
         Self {
             endpoint,
-            service_version,
+            key_credential,
         }
     }
 

@@ -1,5 +1,3 @@
-use std::{borrow::Cow, convert::From};
-
 use azure_core::{auth::Secret, headers::{AUTHORIZATION, HeaderName, HeaderValue}, Header};
 
 pub struct AzureKeyCredential(Secret);

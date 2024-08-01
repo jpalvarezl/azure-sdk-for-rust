@@ -1,13 +1,8 @@
-use std::fmt::format;
-use std::ops::Deref;
 use std::sync::Arc;
-use serde::Serialize;
 
-use azure_core::auth::TokenCredential;
-use azure_core::headers::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE};
-use azure_core::{HttpClient, Method, Request, Url};
+use azure_core::{HttpClient, Method, Url};
 
-use crate::auth::*;
+use crate::auth::OpenAIKeyCredential;
 use crate::{CreateChatCompletionsRequest, CreateChatCompletionsResponse};
 
 pub struct OpenAIClient {
@@ -24,24 +19,14 @@ impl OpenAIClient {
         }
     }
 
-    pub async fn create_chat_completions(&self, chat_completions_request: &CreateChatCompletionsRequest) -> azure_core::Result<CreateChatCompletionsResponse> {
-        let http_client = azure_core::new_http_client();
+    pub async fn create_chat_completions(&self, chat_completions_request: &CreateChatCompletionsRequest) 
+    -> azure_core::Result<CreateChatCompletionsResponse> {
         let url = Url::parse("https://api.openai.com/v1/chat/completions")?;
-        let request  = &self.build_request(url, Method::Post, chat_completions_request);
+        let request  = super::build_request(&self.key_credential, url, Method::Post, chat_completions_request)?;
 
         let response = self.http_client.execute_request(&request).await?;
 
         response.json::<CreateChatCompletionsResponse>().await
-    }
-
-    fn build_request<T>(&self, url: Url, method: Method, data: &T) -> Request
-    where T: ?Sized + Serialize {
-        let mut request = Request::new(url, method);
-        request.add_mandatory_header(&self.key_credential);
-        request.insert_header(CONTENT_TYPE, "application/json");
-        request.insert_header(ACCEPT, "application/json");
-        request.set_json(data);
-        request
     }
 }
 

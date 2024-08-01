@@ -1,5 +1,4 @@
 use serde::Serialize;
-use std::collections::HashMap;
 
 #[derive(Serialize, Debug, Clone, Default)]
 pub struct CreateChatCompletionsRequest {
