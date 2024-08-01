@@ -12,6 +12,6 @@ pub struct ChatCompletionChoice {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChatCompletionResponseMessage {
-    pub content: String,
+    pub content: Option<String>,
     pub role: String,
 }

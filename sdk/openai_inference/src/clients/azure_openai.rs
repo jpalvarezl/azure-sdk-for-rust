@@ -19,16 +19,29 @@ impl AzureOpenAIClient {
         }
     }
 
-    pub async fn create_chat_completions(&self, deployment_name: &str, api_version: &str,
+    pub async fn create_chat_completions(&self, deployment_name: &str, api_version: AzureServiceVersion,
         chat_completions_request: &CreateChatCompletionsRequest) 
     -> Result<CreateChatCompletionsResponse> {
         let url = Url::parse(&format!("{}/openai/deployments/{}/chat/completions?api-version={}", 
             &self.endpoint,
             deployment_name,
-            api_version)
+            api_version.as_str())
         )?;
         let request  = super::build_request(&self.key_credential, url, Method::Post, chat_completions_request)?;
         let response = self.http_client.execute_request(&request).await?;
         response.json::<CreateChatCompletionsResponse>().await
+    }
+}
+
+pub enum AzureServiceVersion {
+    V2023_12_01Preview,
+}
+
+
+impl AzureServiceVersion {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AzureServiceVersion::V2023_12_01Preview => "2023-12-01-preview",
+        }
     }
 }

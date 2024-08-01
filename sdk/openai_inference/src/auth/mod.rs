@@ -10,13 +10,19 @@ impl OpenAIKeyCredential {
     }
 }
 
+impl AzureKeyCredential {
+    pub fn new(api_key: String) -> Self {
+        Self(Secret::new(api_key))
+    }
+}
+
 impl Header for AzureKeyCredential {
     fn name(&self) -> HeaderName {
-        AUTHORIZATION
+        HeaderName::from_static("api-key")
     }
 
     fn value(&self) -> HeaderValue {
-        HeaderValue::from_cow(format!("api-key {}", self.0.secret()))
+        HeaderValue::from_cow(format!("{}", self.0.secret()))
     }
 }
 
