@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
+use crate::to_reqwest_form;
 
 /// Construct a new `HttpClient`
 pub fn new_http_client() -> Arc<dyn HttpClient> {

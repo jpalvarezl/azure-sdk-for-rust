@@ -13,6 +13,7 @@ async fn main() {
         "Tell me a joke about pineapples");
 
     println!("{:#?}", &chat_completions_request);
+    println!("{:#?}", serde_json::to_string(&chat_completions_request));
     let response = openai_client.create_chat_completions(
         &chat_completions_request.model,
         AzureServiceVersion::V2023_12_01Preview,

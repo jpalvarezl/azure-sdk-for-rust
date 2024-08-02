@@ -166,11 +166,13 @@ impl Debug for Headers {
         let redacted = HeaderValue::from_static("[redacted]");
         f.debug_map()
             .entries(self.0.iter().map(|(name, value)| {
-                if matching_ignore_ascii_case(name.as_str(), AUTHORIZATION.as_str()) {
-                    (name, value)
-                } else {
-                    (name, &redacted)
-                }
+                (name, value)
+                // TODO: restore
+                // if matching_ignore_ascii_case(name.as_str(), AUTHORIZATION.as_str()) {
+                //     (name, value)
+                // } else {
+                //     (name, &redacted)
+                // }
             }))
             .finish()?;
         write!(f, ")")

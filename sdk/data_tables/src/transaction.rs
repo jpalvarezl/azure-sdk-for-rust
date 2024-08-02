@@ -62,6 +62,7 @@ impl TransactionOperations {
                 }
                 #[cfg(not(target_arch = "wasm32"))]
                 azure_core::Body::SeekableStream(_) => todo!(),
+                azure_core::Body::Multipart(_) => todo!(),
             }
         }
 
