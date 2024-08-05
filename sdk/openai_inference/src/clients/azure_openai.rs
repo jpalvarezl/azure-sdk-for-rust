@@ -43,17 +43,12 @@ impl AzureOpenAIClient {
 
         let request = super::build_multipart_request(&self.key_credential, url, || {
             Ok(MyForm::new()
-                            .text("response_format", create_transcription_request.response_format.to_string())
-                            .file(create_transcription_request.file_name.clone(), create_transcription_request.file.clone()))
+                .text("response_format", create_transcription_request.response_format.to_string())
+                .file(create_transcription_request.file_name.clone(), create_transcription_request.file.clone()))
         });
 
         let response = self.http_client.execute_request(&request?).await?;
-
-        let (status, headers, body, ) = response.deconstruct();
-        println!("{:#?}", &status);
-        println!("{:#?}", &headers);
-        // println!("{:#?}", &body);
-        Ok(body.collect_string().await?)
+        Ok(response.into_body().collect_string().await?)
     }
 }
 

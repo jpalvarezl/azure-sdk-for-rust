@@ -40,6 +40,7 @@ impl CreateTranscriptionRequest {
         Self {
             file,
             file_name: file_name.into(),
+            model: Some(String::from("whisper-1")), // ignored by azure. TODO: remove. Defaults should be handled better
             ..Default::default()
         }
     }

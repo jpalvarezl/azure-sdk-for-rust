@@ -20,7 +20,7 @@ async fn main() {
     let mut file_contents = Vec::new();
     let _ = file.read_to_end(&mut file_contents).expect("Failed to read file");
 
-    let create_transcription_request = CreateTranscriptionRequest::new_as_text(file_contents, "batman.wav");
+    let create_transcription_request = CreateTranscriptionRequest::new_as_text(file_contents, "JP_it_is_rainy_today.wav");
     let response = openai_client.create_speech_transcription(
         "whisper-deployment",
         AzureServiceVersion::V2023_12_01Preview,
