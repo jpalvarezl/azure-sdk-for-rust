@@ -4,6 +4,7 @@ use serde::Serialize;
 pub struct CreateChatCompletionsRequest {
     pub messages: Vec<ChatCompletionRequestMessage>,
     pub model: String,
+    pub stream: Option<bool>,
     // pub frequency_penalty: f64,
     // pub logit_bias: Option<HashMap<String, f64>>,
     // pub logprobs: Option<bool>,
@@ -29,16 +30,16 @@ pub enum ChatCompletionRequestMessage {
 
 
 impl ChatCompletionRequestMessage {
-    pub fn new_user(content: &str) -> Self {
+    pub fn new_user(content: impl Into<String>) -> Self {
         Self::User(ChatCompletionRequestMessageBase {
-            content: content.to_string(),
+            content: content.into(),
             name: None,
         })
     }
 
-    pub fn new_system(content: &str) -> Self {
+    pub fn new_system(content: impl Into<String>) -> Self {
         Self::System(ChatCompletionRequestMessageBase {
-            content: content.to_string(),
+            content: content.into(),
             name: None,
         })
     }
@@ -50,6 +51,15 @@ impl CreateChatCompletionsRequest {
         Self {
             model: model.to_string(),
             messages: vec![ChatCompletionRequestMessage::new_user(prompt)],
+            ..Default::default()
+        }
+    }
+
+    pub fn new_stream_with_user_message(model: impl Into<String>, prompt: impl Into<String>) -> Self {
+        Self {
+            model: model.into(),
+            messages: vec![ChatCompletionRequestMessage::new_user(prompt)],
+            stream: Some(true),
             ..Default::default()
         }
     }
