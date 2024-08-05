@@ -8,13 +8,13 @@ async fn main() {
 
     let openai_client = AzureOpenAIClient::new(endpoint, AzureKeyCredential::new(secret));
 
-    let chat_completions_request = CreateChatCompletionsRequest::new_with_user_message(
+    let chat_completions_request = CreateChatCompletionsRequest::new_stream_with_user_message(
         "gpt-4-1106-preview",
-        "Tell me a joke about pineapples");
+        "Write me a 1000 words essay on the nutritional values (or lack thereof) of fast food.",);
 
     println!("{:#?}", &chat_completions_request);
     println!("{:#?}", serde_json::to_string(&chat_completions_request));
-    let response = openai_client.create_chat_completions(
+    let response = openai_client.stream_chat_completion(
         &chat_completions_request.model,
         AzureServiceVersion::V2023_12_01Preview,
         &chat_completions_request
