@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use crate::{AzureKeyCredential, CreateChatCompletionsRequest, CreateChatCompletionsResponse, CreateTranscriptionRequest};
-use azure_core::{HttpClient, Method, MyForm, Result, Url};
-use futures::StreamExt;
+use azure_core::{HttpClient, Method, MyForm, Result, Error, Url};
+use futures::Stream;
+use futures::stream::TryStreamExt;
 
 pub struct AzureOpenAIClient {
     http_client: Arc<dyn HttpClient>,
@@ -31,33 +32,29 @@ impl AzureOpenAIClient {
         let request  = super::build_request(&self.key_credential, url, Method::Post, chat_completions_request)?;
         let response = self.http_client.execute_request(&request).await?;
         response.json::<CreateChatCompletionsResponse>().await
-    }
-
+    }    
+    
     pub async fn stream_chat_completion(&self, deployment_name: &str, api_version: AzureServiceVersion,
         chat_completions_request: &CreateChatCompletionsRequest) 
-    -> Result<()> {
+    -> Result<impl Stream<Item = Result<String>>> {
         let url = Url::parse(&format!("{}/openai/deployments/{}/chat/completions?api-version={}", 
             &self.endpoint,
             deployment_name,
             api_version.as_str())
         )?;
         let request  = super::build_request(&self.key_credential, url, Method::Post, chat_completions_request)?;
-        let mut response = self.http_client.execute_request(&request).await?.into_body();
+        let response = self.http_client.execute_request(&request).await?;
 
-        let mut i = 0;
-        while let Some(chunk) = response.next().await {
-            // bytes::Bytes derefs into &[u8]
-            println!("Chunk {}:", i);
-            println!();
-            println!();
-            println!("{:?}", std::str::from_utf8(chunk?.as_ref()));
-            println!();
-            println!();
-            i += 1;
-        }
-
-        Ok(())
+        Ok(response.into_body()
+                .and_then(|chunk| {
+                    std::future::ready(std::str::from_utf8(&chunk)
+                        .map(String::from)
+                        .map_err(Error::from)
+                    )
+                }
+            ))
     }
+
 
     pub async fn create_speech_transcription(&self, deployment_name: &str, api_version: AzureServiceVersion,
         create_transcription_request: &CreateTranscriptionRequest) 
