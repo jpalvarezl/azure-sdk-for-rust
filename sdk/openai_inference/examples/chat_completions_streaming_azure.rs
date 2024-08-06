@@ -3,7 +3,6 @@ use azure_core::Result;
 use azure_openai_inference::{AzureServiceVersion, CreateChatCompletionsRequest, CreateChatCompletionsStreamResponse};
 use azure_openai_inference::{AzureOpenAIClient, AzureKeyCredential};
 use futures::stream::StreamExt;
-use serde::de;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,7 +28,15 @@ async fn main() -> Result<()> {
 
     while let Some(result) = response.next().await {
         match result {
-            Ok(delta) => print!(delta.choices[0]),
+            Ok(delta) => {
+                if let Some(choice) = delta.choices.get(0) {
+                    choice.delta.as_ref().map(|d| {
+                        d.content.as_ref().map(|c| {
+                            print!("{}", c);
+                        });
+                    });
+                }
+            },
             Err(e) => println!("Error: {:?}", e),
         }
     }

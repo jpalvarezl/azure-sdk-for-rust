@@ -35,7 +35,7 @@ impl AzureOpenAIClient {
     }    
     
     // This works, it's a simple implementation of the streaming, no chunking
-    // pub async fn stream_chat_completion(&self, deployment_name: &str, api_version: AzureServiceVersion,
+    // pub async fn stream_chat_completion_raw_chunks(&self, deployment_name: &str, api_version: AzureServiceVersion,
     //     chat_completions_request: &CreateChatCompletionsRequest) 
     // -> Result<impl Stream<Item = Result<String>>> {
     //     let url = Url::parse(&format!("{}/openai/deployments/{}/chat/completions?api-version={}", 
@@ -90,6 +90,9 @@ impl AzureOpenAIClient {
             if !buffer.is_empty() {
                 match std::str::from_utf8(&buffer) {
                     Ok(valid_str) => {
+                        if valid_str.trim().ends_with("[DONE]") {
+                            return None;
+                        }
                         let result = Some((Ok(valid_str.to_string()), (body_stream, Vec::new())));
                         buffer.clear();
                         result
@@ -101,8 +104,11 @@ impl AzureOpenAIClient {
             }
         });
 
-        Ok(stream.and_then(|stream_chunk| {
-            std::future::ready(serde_json::from_str(&stream_chunk)).map_err(Error::from)
+        Ok(stream.map_ok(|stream_chunk| {
+            // stripping the "data :" prefix
+            
+            let massaged_chunk = stream_chunk.replacen("data: ", "", 1);
+            serde_json::from_str(&massaged_chunk.trim()).unwrap()
         }))
     }
 
