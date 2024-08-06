@@ -1,9 +1,11 @@
+use azure_core::Result;
+
 use azure_openai_inference::{AzureServiceVersion, CreateChatCompletionsRequest};
 use azure_openai_inference::{AzureOpenAIClient, AzureKeyCredential};
 use futures::stream::StreamExt;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let endpoint = std::env::var("AZURE_OPENAI_ENDPOINT").expect("Set AZURE_OPENAI_ENDPOINT env variable");
     let secret = std::env::var("AZURE_OPENAI_KEY").expect("Set AZURE_OPENAI_KEY env variable");
 
@@ -15,27 +17,21 @@ async fn main() {
 
     println!("{:#?}", &chat_completions_request);
     println!("{:#?}", serde_json::to_string(&chat_completions_request));
-    let  response = openai_client.stream_chat_completion(
+    let mut response = openai_client.stream_chat_completion(
         &chat_completions_request.model,
         AzureServiceVersion::V2023_12_01Preview,
         &chat_completions_request
-    ).await;
+    ).await?;
 
-    match response {
-        Ok(mut chat_completions) => {
-            let mut i = 0;
-            while let Some(chunk) = chat_completions.next().await {
-                println!("Chunk {}:", i);
-                println!();
-                println!();
-                println!("{:#?}", &chunk);
-                println!();
-                println!();
-                i += 1;
-            }
-        }
-        Err(e) => {
-            println!("Error: {}", e);
+    // this pins the stream to the stack so it is safe to poll it (namely, it won't be dealloacted or moved)
+    futures::pin_mut!(response);
+
+    while let Some(result) = response.next().await {
+        match result {
+            Ok(string) => println!("Got string: {}", string),
+            Err(e) => println!("Error: {:?}", e),
         }
     }
+
+    Ok(())
 }
