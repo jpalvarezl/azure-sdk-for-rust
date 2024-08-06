@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::{AzureKeyCredential, CreateChatCompletionsRequest, CreateChatCompletionsResponse, CreateTranscriptionRequest};
+use crate::{AzureKeyCredential, CreateChatCompletionsRequest, CreateChatCompletionsResponse, CreateChatCompletionsStreamResponse, CreateTranscriptionRequest};
 use azure_core::{HttpClient, Method, MyForm, Result, Error, Url};
-use futures::{stream, Stream, StreamExt};
+use futures::{stream, Stream, StreamExt, TryFutureExt};
 use futures::stream::TryStreamExt;
 
 pub struct AzureOpenAIClient {
@@ -58,7 +58,7 @@ impl AzureOpenAIClient {
 
     pub async fn stream_chat_completion(&self, deployment_name: &str, api_version: AzureServiceVersion,
         chat_completions_request: &CreateChatCompletionsRequest) 
-    -> Result<impl Stream<Item = Result<String>>> {
+    -> Result<impl Stream<Item = Result<CreateChatCompletionsStreamResponse>>> {
         let url = Url::parse(&format!("{}/openai/deployments/{}/chat/completions?api-version={}", 
             &self.endpoint,
             deployment_name,
@@ -101,7 +101,9 @@ impl AzureOpenAIClient {
             }
         });
 
-        Ok(stream)
+        Ok(stream.and_then(|stream_chunk| {
+            std::future::ready(serde_json::from_str(&stream_chunk)).map_err(Error::from)
+        }))
     }
 
 

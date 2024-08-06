@@ -1,8 +1,9 @@
 use azure_core::Result;
 
-use azure_openai_inference::{AzureServiceVersion, CreateChatCompletionsRequest};
+use azure_openai_inference::{AzureServiceVersion, CreateChatCompletionsRequest, CreateChatCompletionsStreamResponse};
 use azure_openai_inference::{AzureOpenAIClient, AzureKeyCredential};
 use futures::stream::StreamExt;
+use serde::de;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -28,7 +29,7 @@ async fn main() -> Result<()> {
 
     while let Some(result) = response.next().await {
         match result {
-            Ok(string) => println!("Got string: {}", string),
+            Ok(delta) => print!(delta.choices[0]),
             Err(e) => println!("Error: {:?}", e),
         }
     }
