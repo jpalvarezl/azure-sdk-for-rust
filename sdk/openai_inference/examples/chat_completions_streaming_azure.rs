@@ -13,7 +13,8 @@ async fn main() -> Result<()> {
 
     let chat_completions_request = CreateChatCompletionsRequest::new_stream_with_user_message(
         "gpt-4-1106-preview",
-        "Write me a 200 words essay on the nutritional values (or lack thereof) of fast food.",);
+        "Write me an essay that is at least 200 words long on the nutritional values (or lack thereof) of fast food.
+        Start the essay by stating 'this essay will be x many words long' where x is the number of words in the essay.",);
 
     println!("{:#?}", &chat_completions_request);
     println!("{:#?}", serde_json::to_string(&chat_completions_request));

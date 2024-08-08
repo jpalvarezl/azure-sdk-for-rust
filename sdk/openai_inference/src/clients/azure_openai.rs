@@ -102,14 +102,14 @@ impl AzureOpenAIClient {
             } else {
                 None
             }
-        });
-
-        Ok(stream.map_ok(|stream_chunk| {
+        }).map_ok(|stream_chunk| {
             // stripping the "data :" prefix
             
             let massaged_chunk = stream_chunk.replacen("data: ", "", 1);
             serde_json::from_str(&massaged_chunk.trim()).unwrap()
-        }))
+        });
+
+        Ok(stream)
     }
 
 
