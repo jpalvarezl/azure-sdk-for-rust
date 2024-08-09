@@ -1,6 +1,6 @@
 use azure_core::Result;
 
-use azure_openai_inference::{AzureServiceVersion, CreateChatCompletionsRequest, CreateChatCompletionsStreamResponse};
+use azure_openai_inference::{AzureServiceVersion, CreateChatCompletionsRequest};
 use azure_openai_inference::{AzureOpenAIClient, AzureKeyCredential};
 use futures::stream::StreamExt;
 
@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
 
     println!("{:#?}", &chat_completions_request);
     println!("{:#?}", serde_json::to_string(&chat_completions_request));
-    let mut response = openai_client.stream_chat_completion(
+    let response = openai_client.stream_chat_completion(
         &chat_completions_request.model,
         AzureServiceVersion::V2023_12_01Preview,
         &chat_completions_request

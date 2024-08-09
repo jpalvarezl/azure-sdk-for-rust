@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{AzureKeyCredential, CreateChatCompletionsRequest, CreateChatCompletionsResponse, CreateChatCompletionsStreamResponse, CreateTranscriptionRequest};
 use azure_core::{HttpClient, Method, MyForm, Result, Error, Url};
-use futures::{stream, Stream, StreamExt, TryFutureExt};
+use futures::{Stream, StreamExt};
 use futures::stream::TryStreamExt;
 
 pub struct AzureOpenAIClient {
@@ -22,9 +22,9 @@ impl AzureOpenAIClient {
     }
 
     pub async fn create_chat_completions(&self, deployment_name: &str, api_version: AzureServiceVersion,
-        chat_completions_request: &CreateChatCompletionsRequest) 
+        chat_completions_request: &CreateChatCompletionsRequest)
     -> Result<CreateChatCompletionsResponse> {
-        let url = Url::parse(&format!("{}/openai/deployments/{}/chat/completions?api-version={}", 
+        let url = Url::parse(&format!("{}/openai/deployments/{}/chat/completions?api-version={}",
             &self.endpoint,
             deployment_name,
             api_version.as_str())
@@ -32,13 +32,13 @@ impl AzureOpenAIClient {
         let request  = super::build_request(&self.key_credential, url, Method::Post, chat_completions_request)?;
         let response = self.http_client.execute_request(&request).await?;
         response.json::<CreateChatCompletionsResponse>().await
-    }    
-    
+    }
+
     // This works, it's a simple implementation of the streaming, no chunking
     // pub async fn stream_chat_completion_raw_chunks(&self, deployment_name: &str, api_version: AzureServiceVersion,
-    //     chat_completions_request: &CreateChatCompletionsRequest) 
+    //     chat_completions_request: &CreateChatCompletionsRequest)
     // -> Result<impl Stream<Item = Result<String>>> {
-    //     let url = Url::parse(&format!("{}/openai/deployments/{}/chat/completions?api-version={}", 
+    //     let url = Url::parse(&format!("{}/openai/deployments/{}/chat/completions?api-version={}",
     //         &self.endpoint,
     //         deployment_name,
     //         api_version.as_str())
@@ -57,9 +57,9 @@ impl AzureOpenAIClient {
     // }
 
     pub async fn stream_chat_completion(&self, deployment_name: &str, api_version: AzureServiceVersion,
-        chat_completions_request: &CreateChatCompletionsRequest) 
+        chat_completions_request: &CreateChatCompletionsRequest)
     -> Result<impl Stream<Item = Result<CreateChatCompletionsStreamResponse>>> {
-        let url = Url::parse(&format!("{}/openai/deployments/{}/chat/completions?api-version={}", 
+        let url = Url::parse(&format!("{}/openai/deployments/{}/chat/completions?api-version={}",
             &self.endpoint,
             deployment_name,
             api_version.as_str())
@@ -70,7 +70,7 @@ impl AzureOpenAIClient {
         let body_stream = response.into_body();
         let buffer = Vec::new();
 
-        // This accumulates bytes until get 
+        // This accumulates bytes until get
         let stream = futures::stream::unfold((body_stream, buffer), |(mut body_stream, mut buffer)| async move {
             while let Some(chunk) = body_stream.next().await {
                 match chunk {
@@ -86,7 +86,7 @@ impl AzureOpenAIClient {
                     },
                     Err(e) => return Some((Err(e), (body_stream, buffer))),
                 }
-            } 
+            }
             if !buffer.is_empty() {
                 match std::str::from_utf8(&buffer) {
                     Ok(valid_str) => {
@@ -104,7 +104,7 @@ impl AzureOpenAIClient {
             }
         }).map_ok(|stream_chunk| {
             // stripping the "data :" prefix
-            
+
             let massaged_chunk = stream_chunk.replacen("data: ", "", 1);
             serde_json::from_str(&massaged_chunk.trim()).unwrap()
         });
@@ -114,9 +114,9 @@ impl AzureOpenAIClient {
 
 
     pub async fn create_speech_transcription(&self, deployment_name: &str, api_version: AzureServiceVersion,
-        create_transcription_request: &CreateTranscriptionRequest) 
+        create_transcription_request: &CreateTranscriptionRequest)
     -> Result<String> {
-        let url = Url::parse(&format!("{}/openai/deployments/{}/audio/transcriptions?api-version={}", 
+        let url = Url::parse(&format!("{}/openai/deployments/{}/audio/transcriptions?api-version={}",
             &self.endpoint,
             deployment_name,
             api_version.as_str())
