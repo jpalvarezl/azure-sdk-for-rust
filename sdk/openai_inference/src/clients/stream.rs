@@ -101,10 +101,7 @@ mod tests {
 
         let expected: Vec<Result<String>> =
             vec![Ok("piece 1".to_string()), Ok("piece 2".to_string())];
-        assert_eq!(expected.len(), actual.len());
-        expected.iter().enumerate().for_each(|(i, expected)| {
-            assert_eq!(expected.as_ref().unwrap(), actual[i].as_ref().unwrap());
-        });
+        assert_eq!(expected, actual);
 
         Ok(())
     }
@@ -124,10 +121,7 @@ mod tests {
             Ok("piece 2".to_string()),
             Ok("piece 3".to_string()),
         ];
-        assert_eq!(expected.len(), actual.len());
-        expected.iter().enumerate().for_each(|(i, expected)| {
-            assert_eq!(expected.as_ref().unwrap(), actual[i].as_ref().unwrap());
-        });
+        assert_eq!(expected, actual);
         Ok(())
     }
 }

@@ -85,7 +85,7 @@ impl Display for ErrorKind {
 // TODO: being able to derive PartialEq here would simplify some tests.
 // Context::Custom inner boxed type prevents this. Check if there is a path to being able to derive it.
 /// An error encountered from interfacing with Azure
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Error {
     context: Context,
 }
@@ -385,7 +385,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Context {
     Simple(ErrorKind),
     Message {
@@ -400,6 +400,14 @@ enum Context {
 struct Custom {
     kind: ErrorKind,
     error: Box<dyn std::error::Error + Send + Sync>,
+}
+
+// Horrendous hack, so that I can easily assert_eq in tests. This makes the azure_core::Error unfortunately not implement
+// PartialEq, which is necessary to make comparison and assertion outputs more readable.
+impl PartialEq for Custom {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind && self.error.to_string() == other.error.to_string()
+    }
 }
 
 #[cfg(test)]
