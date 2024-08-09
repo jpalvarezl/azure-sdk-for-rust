@@ -6,7 +6,7 @@ use crate::{
 };
 use azure_core::{Error, HttpClient, Method, MyForm, Result, Url};
 use futures::stream::TryStreamExt;
-use futures::{Stream, StreamExt};
+use futures::{stream, Stream, StreamExt};
 
 pub struct AzureOpenAIClient {
     http_client: Arc<dyn HttpClient>,
