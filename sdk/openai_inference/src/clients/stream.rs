@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::pin::Pin;
 
 use async_trait::async_trait;
@@ -30,7 +31,7 @@ pub struct ChatCompletionStreamHandler;
 /// * `stream_event_delimiter` - The delimiter of server sent events. Usually either "\n\n" or "\r\n\r\n".
 async fn string_chunks(
     response_body: (impl Stream<Item = Result<bytes::Bytes>> + Unpin),
-    stream_event_delimiter: &str,
+    _stream_event_delimiter: &str, // figure out how to use it in the move
 ) -> Result<impl Stream<Item = String>> {
     let chunk_buffer = Vec::new();
     let stream = futures::stream::unfold(
@@ -38,11 +39,18 @@ async fn string_chunks(
         |(mut response_body, mut chunk_buffer)| async move {
             if let Some(Ok(bytes)) = response_body.next().await {
                 chunk_buffer.extend_from_slice(&bytes);
-                if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
-                    Some((yielded_value.to_string(), (response_body, chunk_buffer)))
-                } else {
-                    None
+                while let Some(pos) = chunk_buffer.windows(2).position(
+                    |window| window == b"\n\n") {
+                        let mut bytes = chunk_buffer.drain(..pos + 2).collect::<Vec<_>>();
+                        bytes.truncate(bytes.len() - 2);
+                        if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
+                            let yielded_value = yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
+                            return Some((yielded_value.to_string(), (response_body, chunk_buffer)));
+                        } else {
+                            return None;
+                        }
                 }
+                None
             } else {
                 None
             }
