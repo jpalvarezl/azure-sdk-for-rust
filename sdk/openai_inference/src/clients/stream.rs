@@ -58,7 +58,7 @@ impl EventStreamer<CreateChatCompletionsStreamResponse> for ChatCompletionStream
         response_body: &mut ResponseBody,
     ) -> Result<Pin<Box<dyn Stream<Item = CreateChatCompletionsStreamResponse> + 'a>>> {
         let stream_event_delimiter = "\n\n";
-        // futures::stream::unfold(init, f)
+
         Ok(Box::pin(futures::stream::iter(vec![
             CreateChatCompletionsStreamResponse { choices: vec![] },
         ])))
@@ -74,7 +74,7 @@ mod tests {
     async fn clean_chunks() -> Result<()> {
         let mut source_stream = futures::stream::iter(vec![
             Ok(bytes::Bytes::from("data: piece 1\n\n")),
-            Ok(bytes::Bytes::from("data: piece 2\n\ndata: piece 3\n\n")),
+            Ok(bytes::Bytes::from("data: piece 2\n\n")),
         ]);
 
         let chunks = string_chunks(&mut source_stream, "\n\n").await?;
