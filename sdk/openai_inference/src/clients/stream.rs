@@ -4,18 +4,19 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use azure_core::ResponseBody;
 use azure_core::{Error, Result};
-use futures::Stream;
+use futures::{Stream, TryFutureExt};
 use futures::StreamExt;
 use futures::TryStreamExt;
 
 use crate::CreateChatCompletionsStreamResponse;
 
+#[async_trait::async_trait]
 pub trait EventStreamer<T> {
     // read more on Higher-Rank Trait Bounds (HRTBs)
-    fn event_stream<'a>(
+    async fn event_stream<'a>(
         &self,
-        response_body: &mut ResponseBody,
-    ) -> Result<Pin<Box<dyn Stream<Item = T> + 'a>>>
+        response_body: &'a mut ResponseBody,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<T>> + 'a>>>
     where
         T: serde::de::DeserializeOwned + 'a;
 }
@@ -89,16 +90,20 @@ async fn string_chunks(
     return Ok(stream.filter(|it| std::future::ready(it.is_ok())));
 }
 
+#[async_trait::async_trait]
 impl EventStreamer<CreateChatCompletionsStreamResponse> for ChatCompletionStreamHandler {
-    fn event_stream<'a>(
+    async fn event_stream<'a>(
         &self,
-        response_body: &mut ResponseBody,
-    ) -> Result<Pin<Box<dyn Stream<Item = CreateChatCompletionsStreamResponse> + 'a>>> {
+        response_body: &'a mut ResponseBody,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<CreateChatCompletionsStreamResponse>> + 'a>>> {
         let stream_event_delimiter = "\n\n";
 
-        Ok(Box::pin(futures::stream::iter(vec![
-            CreateChatCompletionsStreamResponse { choices: vec![] },
-        ])))
+        let stream = string_chunks(response_body, stream_event_delimiter).await?
+            .map_ok(|event| {
+                serde_json::from_str::<CreateChatCompletionsStreamResponse>(&event).expect("Deserialization failed")
+                // CreateChatCompletionsStreamResponse { choices: vec![] }
+            });
+        Ok(Box::pin(stream))
     }
 }
 
