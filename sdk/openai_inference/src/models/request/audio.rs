@@ -10,17 +10,17 @@ pub struct CreateTranscriptionRequest {
 pub struct CreateTranslationRequest {
     pub file: Vec<u8>,
     pub file_name: String,
-    pub response_format: OutputFormat
+    pub response_format: OutputFormat,
 }
 
 #[derive(Debug, Clone, Default)]
 pub enum OutputFormat {
-    JSON, 
+    JSON,
     #[default]
-    Text, 
-    SRT, 
-    VerboseJSON, 
-    VTT
+    Text,
+    SRT,
+    VerboseJSON,
+    VTT,
 }
 
 impl ToString for OutputFormat {

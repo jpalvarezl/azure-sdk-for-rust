@@ -16,7 +16,6 @@ pub struct ChatCompletionResponseMessage {
     pub role: String,
 }
 
-
 // region: --- Streaming
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateChatCompletionsStreamResponse {

@@ -1,8 +1,12 @@
-use azure_core::{auth::Secret, headers::{AUTHORIZATION, HeaderName, HeaderValue}, Header};
+use azure_core::{
+    auth::Secret,
+    headers::{HeaderName, HeaderValue, AUTHORIZATION},
+    Header,
+};
 
 pub struct AzureKeyCredential(Secret);
 
-pub struct OpenAIKeyCredential (Secret);
+pub struct OpenAIKeyCredential(Secret);
 
 impl OpenAIKeyCredential {
     pub fn new(access_token: String) -> Self {
@@ -34,5 +38,4 @@ impl Header for OpenAIKeyCredential {
     fn value(&self) -> HeaderValue {
         HeaderValue::from_cow(format!("Bearer {}", &self.0.secret()))
     }
-    
 }

@@ -1,2 +1,2 @@
-pub mod chat_completions;
 pub mod audio;
+pub mod chat_completions;

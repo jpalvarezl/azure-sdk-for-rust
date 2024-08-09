@@ -28,7 +28,6 @@ pub enum ChatCompletionRequestMessage {
     User(ChatCompletionRequestMessageBase),
 }
 
-
 impl ChatCompletionRequestMessage {
     pub fn new_user(content: impl Into<String>) -> Self {
         Self::User(ChatCompletionRequestMessageBase {
@@ -43,10 +42,8 @@ impl ChatCompletionRequestMessage {
             name: None,
         })
     }
-    
 }
 impl CreateChatCompletionsRequest {
-
     pub fn new_with_user_message(model: &str, prompt: &str) -> Self {
         Self {
             model: model.to_string(),
@@ -55,7 +52,10 @@ impl CreateChatCompletionsRequest {
         }
     }
 
-    pub fn new_stream_with_user_message(model: impl Into<String>, prompt: impl Into<String>) -> Self {
+    pub fn new_stream_with_user_message(
+        model: impl Into<String>,
+        prompt: impl Into<String>,
+    ) -> Self {
         Self {
             model: model.into(),
             messages: vec![ChatCompletionRequestMessage::new_user(prompt)],
