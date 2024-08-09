@@ -92,4 +92,18 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn multiple_message_in_one_chunk() -> Result<()> {
+        let mut source_stream = futures::stream::iter(vec![
+            Ok(bytes::Bytes::from("data: piece 1\n\ndata: piece 2\n\n")),
+            Ok(bytes::Bytes::from("data: piece 3\n\n")),
+        ]);
+
+        let chunks = string_chunks(&mut source_stream, "\n\n").await?;
+        let chunks: Vec<String> = chunks.collect().await;
+
+        assert_eq!(chunks, vec!["piece 1", "piece 2", "piece 3"]);
+        Ok(())
+    }
 }
