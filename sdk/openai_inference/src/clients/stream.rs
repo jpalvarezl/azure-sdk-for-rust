@@ -39,15 +39,17 @@ async fn string_chunks(
         |(mut response_body, mut chunk_buffer)| async move {
             if let Some(Ok(bytes)) = response_body.next().await {
                 chunk_buffer.extend_from_slice(&bytes);
+                // Looking for the next occurence of the event delimiter
                 while let Some(pos) = chunk_buffer.windows(2).position(|window| window == b"\n\n") {
                     let mut bytes = chunk_buffer.drain(..pos + 2).collect::<Vec<_>>();
+                    // we remove the delimiter
                     bytes.truncate(bytes.len() - 2);
                     return if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
-                        let yielded_value = yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
-                        Some((
-                            Ok(yielded_value.to_string()),
-                            (response_body, chunk_buffer),
-                        ))
+                        // We strip the "data: " portion of the event. The rest is always JSON and will be deserialized
+                        // by a subsquent mapping function for this stream
+                        let yielded_value =
+                            yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
+                        Some((Ok(yielded_value.to_string()), (response_body, chunk_buffer)))
                     } else {
                         None
                     };
@@ -61,28 +63,29 @@ async fn string_chunks(
                         (response_body, chunk_buffer),
                     ));
                 }
+            // We drain the buffer of any messages that may be left over.
+            // The block above will be skipped, since response_body.next() will be None every time
             } else if !chunk_buffer.is_empty() {
                 // we need to verify if there are any event left in the buffer and emit them individually
                 while let Some(pos) = chunk_buffer.windows(2).position(|window| window == b"\n\n") {
                     let mut bytes = chunk_buffer.drain(..pos + 2).collect::<Vec<_>>();
                     bytes.truncate(bytes.len() - 2);
                     return if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
-                        let yielded_value = yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
-                        Some((
-                            Ok(yielded_value.to_string()),
-                            (response_body, chunk_buffer),
-                        ))
+                        let yielded_value =
+                            yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
+                        Some((Ok(yielded_value.to_string()), (response_body, chunk_buffer)))
                     } else {
                         None
                     };
                 }
                 // if we get to this point, it means we have drained the buffer of all events, meaning that we haven't been able to find the next delimiter
-
             }
             None
         },
     );
 
+    // We filter errors, we should specifically target the error type yielded when we are not able to find an event in a chunk
+    // Specifically the Error::with_messagge(ErrorKind::DataConversion, || "Incomplete chunk")
     return Ok(stream.filter(|it| std::future::ready(it.is_ok())));
 }
 
@@ -110,7 +113,7 @@ mod tests {
         let mut source_stream = futures::stream::iter(vec![
             Ok(bytes::Bytes::from("data: piece 1\n\n")),
             Ok(bytes::Bytes::from("data: piece 2\n\n")),
-            Ok(bytes::Bytes::from("data: [DONE]"))
+            Ok(bytes::Bytes::from("data: [DONE]")),
         ]);
 
         let actual = string_chunks(&mut source_stream, "\n\n").await?;
@@ -137,6 +140,40 @@ mod tests {
             Ok("piece 1".to_string()),
             Ok("piece 2".to_string()),
             Ok("piece 3".to_string()),
+        ];
+        assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn event_delimeter_split_across_chunks() -> Result<()> {
+        let mut source_stream = futures::stream::iter(vec![
+            Ok(bytes::Bytes::from("data: piece 1\n")),
+            Ok(bytes::Bytes::from("\ndata: [DONE]")),
+        ]);
+
+        let actual = string_chunks(&mut source_stream, "\n\n").await?;
+        let actual: Vec<Result<String>> = actual.collect().await;
+
+        let expected: Vec<Result<String>> = vec![
+            Ok("piece 1".to_string()),
+        ];
+        assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn event_delimiter_at_start_of_next_chunk() -> Result<()> {
+        let mut source_stream = futures::stream::iter(vec![
+            Ok(bytes::Bytes::from("data: piece 1")),
+            Ok(bytes::Bytes::from("\n\ndata: [DONE]")),
+        ]);
+
+        let actual = string_chunks(&mut source_stream, "\n\n").await?;
+        let actual: Vec<Result<String>> = actual.collect().await;
+
+        let expected: Vec<Result<String>> = vec![
+            Ok("piece 1".to_string()),
         ];
         assert_eq!(expected, actual);
         Ok(())
