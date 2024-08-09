@@ -42,16 +42,15 @@ async fn string_chunks(
                 while let Some(pos) = chunk_buffer.windows(2).position(|window| window == b"\n\n") {
                     let mut bytes = chunk_buffer.drain(..pos + 2).collect::<Vec<_>>();
                     bytes.truncate(bytes.len() - 2);
-                    if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
-                        let yielded_value =
-                            yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
-                        return Some((
+                    return if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
+                        let yielded_value = yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
+                        Some((
                             Ok(yielded_value.to_string()),
                             (response_body, chunk_buffer),
-                        ));
+                        ))
                     } else {
-                        return None;
-                    }
+                        None
+                    };
                 }
                 if chunk_buffer.len() > 0 {
                     return Some((
@@ -62,12 +61,29 @@ async fn string_chunks(
                         (response_body, chunk_buffer),
                     ));
                 }
+            } else if !chunk_buffer.is_empty() {
+                // we need to verify if there are any event left in the buffer and emit them individually
+                while let Some(pos) = chunk_buffer.windows(2).position(|window| window == b"\n\n") {
+                    let mut bytes = chunk_buffer.drain(..pos + 2).collect::<Vec<_>>();
+                    bytes.truncate(bytes.len() - 2);
+                    return if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
+                        let yielded_value = yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
+                        Some((
+                            Ok(yielded_value.to_string()),
+                            (response_body, chunk_buffer),
+                        ))
+                    } else {
+                        None
+                    };
+                }
+                // if we get to this point, it means we have drained the buffer of all events, meaning that we haven't been able to find the next delimiter
+
             }
             None
         },
     );
 
-    return Ok(stream);
+    return Ok(stream.filter(|it| std::future::ready(it.is_ok())));
 }
 
 impl EventStreamer<CreateChatCompletionsStreamResponse> for ChatCompletionStreamHandler {
@@ -94,6 +110,7 @@ mod tests {
         let mut source_stream = futures::stream::iter(vec![
             Ok(bytes::Bytes::from("data: piece 1\n\n")),
             Ok(bytes::Bytes::from("data: piece 2\n\n")),
+            Ok(bytes::Bytes::from("data: [DONE]"))
         ]);
 
         let actual = string_chunks(&mut source_stream, "\n\n").await?;
@@ -110,7 +127,7 @@ mod tests {
     async fn multiple_message_in_one_chunk() -> Result<()> {
         let mut source_stream = futures::stream::iter(vec![
             Ok(bytes::Bytes::from("data: piece 1\n\ndata: piece 2\n\n")),
-            Ok(bytes::Bytes::from("data: piece 3\n\n")),
+            Ok(bytes::Bytes::from("data: piece 3\n\ndata: [DONE]")),
         ]);
 
         let actual = string_chunks(&mut source_stream, "\n\n").await?;
