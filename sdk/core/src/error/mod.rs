@@ -82,6 +82,8 @@ impl Display for ErrorKind {
     }
 }
 
+// TODO: being able to derive PartialEq here would simplify some tests.
+// Context::Custom inner boxed type prevents this. Check if there is a path to being able to derive it.
 /// An error encountered from interfacing with Azure
 #[derive(Debug)]
 pub struct Error {

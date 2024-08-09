@@ -3,7 +3,7 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use azure_core::ResponseBody;
-use azure_core::Result;
+use azure_core::{Error, Result};
 use futures::Stream;
 use futures::StreamExt;
 use futures::TryStreamExt;
@@ -32,28 +32,38 @@ pub struct ChatCompletionStreamHandler;
 async fn string_chunks(
     response_body: (impl Stream<Item = Result<bytes::Bytes>> + Unpin),
     _stream_event_delimiter: &str, // figure out how to use it in the move
-) -> Result<impl Stream<Item = String>> {
+) -> Result<impl Stream<Item = Result<String>>> {
     let chunk_buffer = Vec::new();
     let stream = futures::stream::unfold(
         (response_body, chunk_buffer),
         |(mut response_body, mut chunk_buffer)| async move {
             if let Some(Ok(bytes)) = response_body.next().await {
                 chunk_buffer.extend_from_slice(&bytes);
-                while let Some(pos) = chunk_buffer.windows(2).position(
-                    |window| window == b"\n\n") {
-                        let mut bytes = chunk_buffer.drain(..pos + 2).collect::<Vec<_>>();
-                        bytes.truncate(bytes.len() - 2);
-                        if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
-                            let yielded_value = yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
-                            return Some((yielded_value.to_string(), (response_body, chunk_buffer)));
-                        } else {
-                            return None;
-                        }
+                while let Some(pos) = chunk_buffer.windows(2).position(|window| window == b"\n\n") {
+                    let mut bytes = chunk_buffer.drain(..pos + 2).collect::<Vec<_>>();
+                    bytes.truncate(bytes.len() - 2);
+                    if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
+                        let yielded_value =
+                            yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
+                        return Some((
+                            Ok(yielded_value.to_string()),
+                            (response_body, chunk_buffer),
+                        ));
+                    } else {
+                        return None;
+                    }
                 }
-                None
-            } else {
-                None
+                if chunk_buffer.len() > 0 {
+                    return Some((
+                        Err(Error::with_message(
+                            azure_core::error::ErrorKind::DataConversion,
+                            || "Incomplete chunk",
+                        )),
+                        (response_body, chunk_buffer),
+                    ));
+                }
             }
+            None
         },
     );
 
@@ -77,6 +87,7 @@ impl EventStreamer<CreateChatCompletionsStreamResponse> for ChatCompletionStream
 mod tests {
     use super::*;
     use azure_core::ResponseBody;
+    use tracing::debug;
 
     #[tokio::test]
     async fn clean_chunks() -> Result<()> {
@@ -85,10 +96,15 @@ mod tests {
             Ok(bytes::Bytes::from("data: piece 2\n\n")),
         ]);
 
-        let chunks = string_chunks(&mut source_stream, "\n\n").await?;
-        let chunks: Vec<String> = chunks.collect().await;
+        let actual = string_chunks(&mut source_stream, "\n\n").await?;
+        let actual: Vec<Result<String>> = actual.collect().await;
 
-        assert_eq!(chunks, vec!["piece 1", "piece 2"]);
+        let expected: Vec<Result<String>> =
+            vec![Ok("piece 1".to_string()), Ok("piece 2".to_string())];
+        assert_eq!(expected.len(), actual.len());
+        expected.iter().enumerate().for_each(|(i, expected)| {
+            assert_eq!(expected.as_ref().unwrap(), actual[i].as_ref().unwrap());
+        });
 
         Ok(())
     }
@@ -100,10 +116,18 @@ mod tests {
             Ok(bytes::Bytes::from("data: piece 3\n\n")),
         ]);
 
-        let chunks = string_chunks(&mut source_stream, "\n\n").await?;
-        let chunks: Vec<String> = chunks.collect().await;
+        let actual = string_chunks(&mut source_stream, "\n\n").await?;
+        let actual: Vec<Result<String>> = actual.collect().await;
 
-        assert_eq!(chunks, vec!["piece 1", "piece 2", "piece 3"]);
+        let expected: Vec<Result<String>> = vec![
+            Ok("piece 1".to_string()),
+            Ok("piece 2".to_string()),
+            Ok("piece 3".to_string()),
+        ];
+        assert_eq!(expected.len(), actual.len());
+        expected.iter().enumerate().for_each(|(i, expected)| {
+            assert_eq!(expected.as_ref().unwrap(), actual[i].as_ref().unwrap());
+        });
         Ok(())
     }
 }
