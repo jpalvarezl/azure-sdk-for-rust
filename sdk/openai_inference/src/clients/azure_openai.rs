@@ -8,6 +8,8 @@ use azure_core::{Error, HttpClient, Method, MyForm, Result, Url};
 use futures::stream::TryStreamExt;
 use futures::{stream, Stream, StreamExt};
 
+use super::stream::{ChatCompletionStreamHandler, EventStreamer};
+
 pub struct AzureOpenAIClient {
     http_client: Arc<dyn HttpClient>,
     endpoint: String,
@@ -87,62 +89,10 @@ impl AzureOpenAIClient {
         )?;
         let response = self.http_client.execute_request(&request).await?;
 
-        let body_stream = response.into_body();
-        let buffer = Vec::new();
+        let mut response_body = response.into_body();
+        let stream_handler = ChatCompletionStreamHandler::new("\n\n");
 
-        // This accumulates bytes until get
-        let stream = futures::stream::unfold(
-            (body_stream, buffer),
-            |(mut body_stream, mut buffer)| async move {
-                while let Some(chunk) = body_stream.next().await {
-                    match chunk {
-                        Ok(bytes) => {
-                            buffer.extend_from_slice(&bytes);
-                            while let Some(pos) =
-                                buffer.windows(2).position(|window| window == b"\n\n")
-                            {
-                                let string_bytes = buffer.drain(..pos + 2).collect::<Vec<_>>();
-                                match std::str::from_utf8(&string_bytes) {
-                                    Ok(valid_str) => {
-                                        return Some((
-                                            Ok(valid_str.to_string()),
-                                            (body_stream, buffer),
-                                        ))
-                                    }
-                                    Err(e) => {
-                                        return Some((Err(Error::from(e)), (body_stream, buffer)))
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => return Some((Err(e), (body_stream, buffer))),
-                    }
-                }
-                if !buffer.is_empty() {
-                    match std::str::from_utf8(&buffer) {
-                        Ok(valid_str) => {
-                            if valid_str.trim().ends_with("[DONE]") {
-                                return None;
-                            }
-                            let result =
-                                Some((Ok(valid_str.to_string()), (body_stream, Vec::new())));
-                            buffer.clear();
-                            result
-                        }
-                        Err(e) => Some((Err(Error::from(e)), (body_stream, Vec::new()))),
-                    }
-                } else {
-                    None
-                }
-            },
-        )
-        .map_ok(|stream_chunk| {
-            // stripping the "data :" prefix
-
-            let massaged_chunk = stream_chunk.replacen("data: ", "", 1);
-            serde_json::from_str(&massaged_chunk.trim()).unwrap()
-        });
-
+        let stream = stream_handler.event_stream(response_body).await?;
         Ok(stream)
     }
 

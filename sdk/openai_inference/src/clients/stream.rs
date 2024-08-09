@@ -7,6 +7,7 @@ use azure_core::{Error, Result};
 use futures::{Stream, TryFutureExt};
 use futures::StreamExt;
 use futures::TryStreamExt;
+use tracing::debug;
 
 use crate::CreateChatCompletionsStreamResponse;
 
@@ -15,7 +16,7 @@ pub trait EventStreamer<T> {
     // read more on Higher-Rank Trait Bounds (HRTBs)
     async fn event_stream<'a>(
         &self,
-        response_body: &'a mut ResponseBody,
+        mut response_body: ResponseBody,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<T>> + 'a>>>
     where
         T: serde::de::DeserializeOwned + 'a;
@@ -23,7 +24,36 @@ pub trait EventStreamer<T> {
 
 // there will be polymorphic streams where the along with a "data:" payload, there will be an "event:" payload
 // implying a per-event deserialization type. Customer consumption needs to be as seemless as much as as possible.
-pub struct ChatCompletionStreamHandler;
+pub struct ChatCompletionStreamHandler {
+    pub(crate) stream_event_delimiter: String,
+}
+
+impl ChatCompletionStreamHandler {
+
+    pub fn new(stream_event_delimiter: impl Into<String>) -> Self {
+        ChatCompletionStreamHandler {
+            stream_event_delimiter: stream_event_delimiter.into()
+        }
+    }
+}
+
+
+#[async_trait::async_trait]
+impl EventStreamer<CreateChatCompletionsStreamResponse> for ChatCompletionStreamHandler {
+    async fn event_stream<'a>(
+        &self,
+        mut response_body: ResponseBody,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<CreateChatCompletionsStreamResponse>> + 'a>>> {
+
+        let stream = string_chunks(response_body, &self.stream_event_delimiter).await?
+            .map_ok(|event| {
+                debug!("{:?}", &event);
+                serde_json::from_str::<CreateChatCompletionsStreamResponse>(&event).expect("Deserialization failed")
+                // CreateChatCompletionsStreamResponse { choices: vec![] }
+            });
+        Ok(Box::pin(stream))
+    }
+}
 
 /// This function chunks a response body from an HTTP request. It assumes a UTF8 encoding. The delimiter of chunks
 /// can be different on whether it's an Azure endpoint or the unbranded OpenAI service.
@@ -88,23 +118,6 @@ async fn string_chunks(
     // We filter errors, we should specifically target the error type yielded when we are not able to find an event in a chunk
     // Specifically the Error::with_messagge(ErrorKind::DataConversion, || "Incomplete chunk")
     return Ok(stream.filter(|it| std::future::ready(it.is_ok())));
-}
-
-#[async_trait::async_trait]
-impl EventStreamer<CreateChatCompletionsStreamResponse> for ChatCompletionStreamHandler {
-    async fn event_stream<'a>(
-        &self,
-        response_body: &'a mut ResponseBody,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<CreateChatCompletionsStreamResponse>> + 'a>>> {
-        let stream_event_delimiter = "\n\n";
-
-        let stream = string_chunks(response_body, stream_event_delimiter).await?
-            .map_ok(|event| {
-                serde_json::from_str::<CreateChatCompletionsStreamResponse>(&event).expect("Deserialization failed")
-                // CreateChatCompletionsStreamResponse { choices: vec![] }
-            });
-        Ok(Box::pin(stream))
-    }
 }
 
 #[cfg(test)]
