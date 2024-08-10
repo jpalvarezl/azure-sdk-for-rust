@@ -69,6 +69,49 @@ impl AzureOpenAIClient {
     //         ))
     // }
 
+    // method used just for generating test data
+    pub async fn stream_chat_completion_stdout_dump(
+        &self,
+        deployment_name: &str,
+        api_version: AzureServiceVersion,
+        chat_completions_request: &CreateChatCompletionsRequest,
+    ) -> Result<()> {
+        let url = Url::parse(&format!(
+            "{}/openai/deployments/{}/chat/completions?api-version={}",
+            &self.endpoint,
+            deployment_name,
+            api_version.as_str()
+        ))?;
+        let request = super::build_request(
+            &self.key_credential,
+            url,
+            Method::Post,
+            chat_completions_request,
+        )?;
+        let mut response = self.http_client.execute_request(&request).await?.into_body();
+
+        while let Some(chunk) = response.next().await {
+            match chunk {
+                Ok(chunk) => {
+                    let string_chunk = std::str::from_utf8(&chunk).expect("String chunk into utf8 failure");
+                    println!("START OF NEW CHUNK");
+                    println!();
+                    println!();
+                    println!("{:?}", string_chunk);
+                    println!();
+                    println!();
+                    println!("END OF CHUNK");
+                    println!();
+                    println!();
+
+                },
+                Err(_) => todo!(),
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn stream_chat_completion(
         &self,
         deployment_name: &str,

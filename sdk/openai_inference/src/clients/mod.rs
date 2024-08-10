@@ -8,6 +8,8 @@ use serde::Serialize;
 pub mod azure_openai;
 pub mod openai;
 mod stream;
+#[cfg(test)]
+mod tests;
 
 pub(crate) fn build_request<T>(
     key_credential: &impl Header,

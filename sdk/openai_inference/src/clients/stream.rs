@@ -37,7 +37,6 @@ impl ChatCompletionStreamHandler {
     }
 }
 
-
 #[async_trait::async_trait]
 impl EventStreamer<CreateChatCompletionsStreamResponse> for ChatCompletionStreamHandler {
     async fn event_stream<'a>(
@@ -47,9 +46,9 @@ impl EventStreamer<CreateChatCompletionsStreamResponse> for ChatCompletionStream
 
         let stream = string_chunks(response_body, &self.stream_event_delimiter).await?
             .map_ok(|event| {
-                debug!("{:?}", &event);
-                serde_json::from_str::<CreateChatCompletionsStreamResponse>(&event).expect("Deserialization failed")
-                // CreateChatCompletionsStreamResponse { choices: vec![] }
+                // println!("{:?}", &event);
+                // serde_json::from_str::<CreateChatCompletionsStreamResponse>(&event).expect("Deserialization failed")
+                CreateChatCompletionsStreamResponse { choices: vec![] }
             });
         Ok(Box::pin(stream))
     }
@@ -122,6 +121,8 @@ async fn string_chunks(
 
 #[cfg(test)]
 mod tests {
+    use crate::clients::tests::*;
+
     use super::*;
     use azure_core::ResponseBody;
     use tracing::debug;
@@ -131,7 +132,7 @@ mod tests {
         let mut source_stream = futures::stream::iter(vec![
             Ok(bytes::Bytes::from("data: piece 1\n\n")),
             Ok(bytes::Bytes::from("data: piece 2\n\n")),
-            Ok(bytes::Bytes::from("data: [DONE]")),
+            Ok(bytes::Bytes::from("data: [DONE]\n\n")),
         ]);
 
         let actual = string_chunks(&mut source_stream, "\n\n").await?;
@@ -148,7 +149,7 @@ mod tests {
     async fn multiple_message_in_one_chunk() -> Result<()> {
         let mut source_stream = futures::stream::iter(vec![
             Ok(bytes::Bytes::from("data: piece 1\n\ndata: piece 2\n\n")),
-            Ok(bytes::Bytes::from("data: piece 3\n\ndata: [DONE]")),
+            Ok(bytes::Bytes::from("data: piece 3\n\ndata: [DONE]\n\n")),
         ]);
 
         let actual = string_chunks(&mut source_stream, "\n\n").await?;
@@ -193,6 +194,32 @@ mod tests {
         let expected: Vec<Result<String>> = vec![
             Ok("piece 1".to_string()),
         ];
+        assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn real_data() -> Result<()> {
+        let mut source_stream = futures::stream::iter(vec![
+            Ok(bytes::Bytes::from(STREAM_CHUNK_01)),
+            // Ok(bytes::Bytes::from(STREAM_CHUNK_02)),
+            // Ok(bytes::Bytes::from(STREAM_CHUNK_03)),
+            // Ok(bytes::Bytes::from(STREAM_CHUNK_04)),
+            // Ok(bytes::Bytes::from(STREAM_CHUNK_05)),
+            // Ok(bytes::Bytes::from(STREAM_CHUNK_06)),
+            // Ok(bytes::Bytes::from(STREAM_CHUNK_07)),
+            // Ok(bytes::Bytes::from(STREAM_CHUNK_08)),
+            // Ok(bytes::Bytes::from(STREAM_CHUNK_09)),
+            // Ok(bytes::Bytes::from(STREAM_CHUNK_10)),
+        ]);
+
+        let actual = string_chunks(&mut source_stream, "\n\n").await?;
+        let actual: Vec<Result<String>> = actual.collect().await;
+
+        let expected: Vec<Result<String>> = vec![
+            Ok(STREAM_EVENT_01.to_string())
+        ];
+
         assert_eq!(expected, actual);
         Ok(())
     }

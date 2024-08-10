@@ -45,5 +45,8 @@ async fn main() -> Result<()> {
         }
     }
 
+    // openai_client.stream_chat_completion_stdout_dump(&chat_completions_request.model,
+    //             AzureServiceVersion::V2023_12_01Preview,
+    //             &chat_completions_request).await;
     Ok(())
 }
