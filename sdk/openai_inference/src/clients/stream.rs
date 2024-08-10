@@ -70,16 +70,20 @@ async fn string_chunks(
             if let Some(Ok(bytes)) = response_body.next().await {
                 chunk_buffer.extend_from_slice(&bytes);
                 // Looking for the next occurence of the event delimiter
-                while let Some(pos) = chunk_buffer.windows(2).position(|window| window == b"\n\n") {
-                    let mut bytes = chunk_buffer.drain(..pos + 2).collect::<Vec<_>>();
-                    // we remove the delimiter
-                    bytes.truncate(bytes.len() - 2);
+                // it's + 4 because the \n\n are escaped and represented as [92, 110, 92, 110]
+                if let Some(pos) = chunk_buffer.windows(4).position(|window| window == b"\\n\\n") {
+                    // the range must include the delimiter bytes
+                    let mut bytes = chunk_buffer.drain(..pos + 4).collect::<Vec<_>>();
+                    bytes.truncate(bytes.len() - 4);
                     return if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
                         // We strip the "data: " portion of the event. The rest is always JSON and will be deserialized
                         // by a subsquent mapping function for this stream
-                        let yielded_value =
-                            yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
-                        Some((Ok(yielded_value.to_string()), (response_body, chunk_buffer)))
+                        let yielded_value = yielded_value.trim_start_matches("data:").trim();
+                        if (yielded_value == "[DONE]") {
+                            return None;
+                        } else {
+                            Some((Ok(yielded_value.to_string()), (response_body, chunk_buffer)))
+                        }
                     } else {
                         None
                     };
@@ -97,13 +101,18 @@ async fn string_chunks(
             // The block above will be skipped, since response_body.next() will be None every time
             } else if !chunk_buffer.is_empty() {
                 // we need to verify if there are any event left in the buffer and emit them individually
-                while let Some(pos) = chunk_buffer.windows(2).position(|window| window == b"\n\n") {
-                    let mut bytes = chunk_buffer.drain(..pos + 2).collect::<Vec<_>>();
-                    bytes.truncate(bytes.len() - 2);
+                // it's + 4 because the \n\n are escaped and represented as [92, 110, 92, 110]
+                if let Some(pos) = chunk_buffer.windows(4).position(|window| window == b"\\n\\n") {
+                    // the range must include the delimiter bytes
+                    let mut bytes = chunk_buffer.drain(..pos).collect::<Vec<_>>();
+                    bytes.truncate(bytes.len() - 4);
                     return if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
-                        let yielded_value =
-                            yielded_value.split(":").collect::<Vec<&str>>()[1].trim();
-                        Some((Ok(yielded_value.to_string()), (response_body, chunk_buffer)))
+                        let yielded_value = yielded_value.trim_start_matches("data:").trim();
+                        if (yielded_value == "[DONE]") {
+                            return None;
+                        } else {
+                            Some((Ok(yielded_value.to_string()), (response_body, chunk_buffer)))
+                        }
                     } else {
                         None
                     };
@@ -130,12 +139,12 @@ mod tests {
     #[tokio::test]
     async fn clean_chunks() -> Result<()> {
         let mut source_stream = futures::stream::iter(vec![
-            Ok(bytes::Bytes::from("data: piece 1\n\n")),
-            Ok(bytes::Bytes::from("data: piece 2\n\n")),
-            Ok(bytes::Bytes::from("data: [DONE]\n\n")),
+            Ok(bytes::Bytes::from_static(b"data: piece 1\\n\\n")),
+            Ok(bytes::Bytes::from_static(b"data: piece 2\\n\\n")),
+            Ok(bytes::Bytes::from_static(b"data: [DONE]\\n\\n")),
         ]);
 
-        let actual = string_chunks(&mut source_stream, "\n\n").await?;
+        let actual = string_chunks(&mut source_stream, "\\n\\n").await?;
         let actual: Vec<Result<String>> = actual.collect().await;
 
         let expected: Vec<Result<String>> =
@@ -148,8 +157,8 @@ mod tests {
     #[tokio::test]
     async fn multiple_message_in_one_chunk() -> Result<()> {
         let mut source_stream = futures::stream::iter(vec![
-            Ok(bytes::Bytes::from("data: piece 1\n\ndata: piece 2\n\n")),
-            Ok(bytes::Bytes::from("data: piece 3\n\ndata: [DONE]\n\n")),
+            Ok(bytes::Bytes::from_static(b"data: piece 1\\n\\ndata: piece 2\\n\\n")),
+            Ok(bytes::Bytes::from_static(b"data: piece 3\\n\\ndata: [DONE]\\n\\n")),
         ]);
 
         let actual = string_chunks(&mut source_stream, "\n\n").await?;
@@ -167,8 +176,8 @@ mod tests {
     #[tokio::test]
     async fn event_delimeter_split_across_chunks() -> Result<()> {
         let mut source_stream = futures::stream::iter(vec![
-            Ok(bytes::Bytes::from("data: piece 1\n")),
-            Ok(bytes::Bytes::from("\ndata: [DONE]")),
+            Ok(bytes::Bytes::from_static(b"data: piece 1\\n")),
+            Ok(bytes::Bytes::from_static(b"\\ndata: [DONE]")),
         ]);
 
         let actual = string_chunks(&mut source_stream, "\n\n").await?;
@@ -184,8 +193,8 @@ mod tests {
     #[tokio::test]
     async fn event_delimiter_at_start_of_next_chunk() -> Result<()> {
         let mut source_stream = futures::stream::iter(vec![
-            Ok(bytes::Bytes::from("data: piece 1")),
-            Ok(bytes::Bytes::from("\n\ndata: [DONE]")),
+            Ok(bytes::Bytes::from_static(b"data: piece 1")),
+            Ok(bytes::Bytes::from_static(b"\\n\\ndata: [DONE]")),
         ]);
 
         let actual = string_chunks(&mut source_stream, "\n\n").await?;
@@ -223,4 +232,32 @@ mod tests {
         assert_eq!(expected, actual);
         Ok(())
     }
+
+    #[tokio::test]
+    async fn delimiter_search() -> Result<()> {
+        let delimiter = "\\n\\n";
+        let data = bytes::Bytes::from(STREAM_CHUNK_01);
+        let mut buffer = Vec::new();
+        buffer.extend_from_slice(&data);
+
+        // Find the position of the delimiter
+        let pos = buffer.windows(4).position(|window| window == delimiter.as_bytes());
+        match pos {
+            Some(pos) => {
+                // it's + 4 because the \n\n are escaped and represented as [92, 110, 92, 110]
+                let bytes = buffer.drain(..pos).collect::<Vec<_>>();
+                let yielded_value = std::str::from_utf8(&bytes).unwrap();
+                let yielded_value = yielded_value.trim_start_matches("data:").trim();
+
+                assert_eq!(yielded_value, STREAM_EVENT_01);
+            }
+            None => {
+                println!("Delimiter not found in the buffer");
+                assert!(false, "Delimiter not found");
+            }
+        }
+
+        Ok(())
+    }
+
 }
