@@ -46,7 +46,7 @@ impl EventStreamer<CreateChatCompletionsStreamResponse> for ChatCompletionStream
 
         let stream = string_chunks(response_body, &self.stream_event_delimiter).await?
             .map_ok(|event| {
-                println!("EVENT AS A STRING: {:?}", &event);
+                // println!("EVENT AS A STRING: {:?}", &event);
                 serde_json::from_str::<CreateChatCompletionsStreamResponse>(&event).expect("Deserialization failed")
                 // CreateChatCompletionsStreamResponse { choices: vec![] }
             });
@@ -67,14 +67,20 @@ async fn string_chunks(
     let stream = futures::stream::unfold(
         (response_body, chunk_buffer),
         |(mut response_body, mut chunk_buffer)| async move {
+
+
+            // Need to figure out a way how I can move the _stream_event_delimiter into this closure
+            let delimiter = b"\n\n";
+            let delimiter_len = delimiter.len();
+
             if let Some(Ok(bytes)) = response_body.next().await {
                 chunk_buffer.extend_from_slice(&bytes);
                 // Looking for the next occurence of the event delimiter
                 // it's + 4 because the \n\n are escaped and represented as [92, 110, 92, 110]
-                if let Some(pos) = chunk_buffer.windows(4).position(|window| window == b"\\n\\n") {
+                if let Some(pos) = chunk_buffer.windows(delimiter_len).position(|window| window == delimiter) {
                     // the range must include the delimiter bytes
-                    let mut bytes = chunk_buffer.drain(..pos + 4).collect::<Vec<_>>();
-                    bytes.truncate(bytes.len() - 4);
+                    let mut bytes = chunk_buffer.drain(..pos + delimiter_len).collect::<Vec<_>>();
+                    bytes.truncate(bytes.len() - delimiter_len);
 
                     return if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
                         // We strip the "data: " portion of the event. The rest is always JSON and will be deserialized
@@ -103,10 +109,10 @@ async fn string_chunks(
             } else if !chunk_buffer.is_empty() {
                 // we need to verify if there are any event left in the buffer and emit them individually
                 // it's + 4 because the \n\n are escaped and represented as [92, 110, 92, 110]
-                if let Some(pos) = chunk_buffer.windows(4).position(|window| window == b"\\n\\n") {
+                if let Some(pos) = chunk_buffer.windows(delimiter_len).position(|window| window == delimiter) {
                     // the range must include the delimiter bytes
-                    let mut bytes = chunk_buffer.drain(..pos + 4).collect::<Vec<_>>();
-                    bytes.truncate(bytes.len() - 4);
+                    let mut bytes = chunk_buffer.drain(..pos + delimiter_len).collect::<Vec<_>>();
+                    bytes.truncate(bytes.len() - delimiter_len);
 
                     return if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
                         let yielded_value = yielded_value.trim_start_matches("data:").trim();
