@@ -185,6 +185,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn data_marker_inprevious_chunk() -> Result<()> {
+        let mut source_stream = futures::stream::iter(vec![
+            Ok(bytes::Bytes::from_static(b"data: piece 1\\n\\ndata: piece 2\\n\\ndata:")),
+            Ok(bytes::Bytes::from_static(b" piece 3\\n\\ndata: [DONE]\\n\\n")),
+        ]);
+
+        let mut actual = Vec::new();
+
+        let actual_stream = string_chunks(&mut source_stream, "\n\n").await?;
+        pin_mut!(actual_stream);
+
+        while let Some(event) = actual_stream.next().await {
+            actual.push(event);
+        }
+
+        let expected: Vec<Result<String>> = vec![
+            Ok("piece 1".to_string()),
+            Ok("piece 2".to_string()),
+            Ok("piece 3".to_string()),
+        ];
+        assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn event_delimeter_split_across_chunks() -> Result<()> {
         let mut source_stream = futures::stream::iter(vec![
             Ok(bytes::Bytes::from_static(b"data: piece 1\\n")),
