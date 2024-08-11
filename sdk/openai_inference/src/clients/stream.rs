@@ -46,9 +46,9 @@ impl EventStreamer<CreateChatCompletionsStreamResponse> for ChatCompletionStream
 
         let stream = string_chunks(response_body, &self.stream_event_delimiter).await?
             .map_ok(|event| {
-                // println!("{:?}", &event);
-                // serde_json::from_str::<CreateChatCompletionsStreamResponse>(&event).expect("Deserialization failed")
-                CreateChatCompletionsStreamResponse { choices: vec![] }
+                println!("EVENT AS A STRING: {:?}", &event);
+                serde_json::from_str::<CreateChatCompletionsStreamResponse>(&event).expect("Deserialization failed")
+                // CreateChatCompletionsStreamResponse { choices: vec![] }
             });
         Ok(Box::pin(stream))
     }
@@ -75,11 +75,12 @@ async fn string_chunks(
                     // the range must include the delimiter bytes
                     let mut bytes = chunk_buffer.drain(..pos + 4).collect::<Vec<_>>();
                     bytes.truncate(bytes.len() - 4);
+
                     return if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
                         // We strip the "data: " portion of the event. The rest is always JSON and will be deserialized
                         // by a subsquent mapping function for this stream
                         let yielded_value = yielded_value.trim_start_matches("data:").trim();
-                        if (yielded_value == "[DONE]") {
+                        if yielded_value == "[DONE]" {
                             return None;
                         } else {
                             Some((Ok(yielded_value.to_string()), (response_body, chunk_buffer)))
@@ -104,11 +105,12 @@ async fn string_chunks(
                 // it's + 4 because the \n\n are escaped and represented as [92, 110, 92, 110]
                 if let Some(pos) = chunk_buffer.windows(4).position(|window| window == b"\\n\\n") {
                     // the range must include the delimiter bytes
-                    let mut bytes = chunk_buffer.drain(..pos).collect::<Vec<_>>();
+                    let mut bytes = chunk_buffer.drain(..pos + 4).collect::<Vec<_>>();
                     bytes.truncate(bytes.len() - 4);
+
                     return if let Ok(yielded_value) = std::str::from_utf8(&bytes) {
                         let yielded_value = yielded_value.trim_start_matches("data:").trim();
-                        if (yielded_value == "[DONE]") {
+                        if yielded_value == "[DONE]" {
                             return None;
                         } else {
                             Some((Ok(yielded_value.to_string()), (response_body, chunk_buffer)))
@@ -130,10 +132,13 @@ async fn string_chunks(
 
 #[cfg(test)]
 mod tests {
+    use std::string;
+
     use crate::clients::tests::*;
 
     use super::*;
     use azure_core::ResponseBody;
+    use futures::pin_mut;
     use tracing::debug;
 
     #[tokio::test]
@@ -161,8 +166,14 @@ mod tests {
             Ok(bytes::Bytes::from_static(b"data: piece 3\\n\\ndata: [DONE]\\n\\n")),
         ]);
 
-        let actual = string_chunks(&mut source_stream, "\n\n").await?;
-        let actual: Vec<Result<String>> = actual.collect().await;
+        let mut actual = Vec::new();
+
+        let actual_stream = string_chunks(&mut source_stream, "\n\n").await?;
+        pin_mut!(actual_stream);
+
+        while let Some(event) = actual_stream.next().await {
+            actual.push(event);
+        }
 
         let expected: Vec<Result<String>> = vec![
             Ok("piece 1".to_string()),
@@ -235,13 +246,13 @@ mod tests {
 
     #[tokio::test]
     async fn delimiter_search() -> Result<()> {
-        let delimiter = "\\n\\n";
+        let delimiter = b"\\n\\n";
         let data = bytes::Bytes::from(STREAM_CHUNK_01);
         let mut buffer = Vec::new();
         buffer.extend_from_slice(&data);
 
         // Find the position of the delimiter
-        let pos = buffer.windows(4).position(|window| window == delimiter.as_bytes());
+        let pos = buffer.windows(4).position(|window| window == delimiter);
         match pos {
             Some(pos) => {
                 // it's + 4 because the \n\n are escaped and represented as [92, 110, 92, 110]
