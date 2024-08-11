@@ -185,7 +185,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn data_marker_inprevious_chunk() -> Result<()> {
+    async fn data_marker_in_previous_chunk() -> Result<()> {
         let mut source_stream = futures::stream::iter(vec![
             Ok(bytes::Bytes::from_static(b"data: piece 1\\n\\ndata: piece 2\\n\\ndata:")),
             Ok(bytes::Bytes::from_static(b" piece 3\\n\\ndata: [DONE]\\n\\n")),
