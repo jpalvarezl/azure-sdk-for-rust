@@ -222,8 +222,8 @@ mod tests {
     async fn real_data() -> Result<()> {
         let mut source_stream = futures::stream::iter(vec![
             Ok(bytes::Bytes::from(STREAM_CHUNK_01)),
-            // Ok(bytes::Bytes::from(STREAM_CHUNK_02)),
-            // Ok(bytes::Bytes::from(STREAM_CHUNK_03)),
+            Ok(bytes::Bytes::from(STREAM_CHUNK_02)),
+            Ok(bytes::Bytes::from(STREAM_CHUNK_03)),
             // Ok(bytes::Bytes::from(STREAM_CHUNK_04)),
             // Ok(bytes::Bytes::from(STREAM_CHUNK_05)),
             // Ok(bytes::Bytes::from(STREAM_CHUNK_06)),
@@ -237,7 +237,10 @@ mod tests {
         let actual: Vec<Result<String>> = actual.collect().await;
 
         let expected: Vec<Result<String>> = vec![
-            Ok(STREAM_EVENT_01.to_string())
+            Ok(STREAM_EVENT_01.to_string()),
+            Ok(STREAM_EVENT_02.to_string()),
+            Ok(STREAM_EVENT_03_01.to_string()),
+            Ok(STREAM_EVENT_03_02.to_string()),
         ];
 
         assert_eq!(expected, actual);
