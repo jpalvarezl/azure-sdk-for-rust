@@ -11,6 +11,8 @@ use std::time::Duration;
 
 use azure_core::{auth::Secret, error::Error, HttpClient};
 
+use super::SendMessageOptions;
+
 /// Client object that allows interaction with the `ServiceBus` API
 #[derive(Debug, Clone)]
 pub struct QueueClient {
@@ -49,7 +51,11 @@ impl QueueClient {
     }
 
     /// Sends a message to the queue
-    pub async fn send_message(&self, msg: &str) -> Result<(), Error> {
+    pub async fn send_message(
+        &self,
+        msg: &str,
+        send_message_options: Option<SendMessageOptions>,
+    ) -> Result<(), Error> {
         send_message(
             &self.http_client,
             &self.namespace,
@@ -57,6 +63,7 @@ impl QueueClient {
             &self.policy_name,
             &self.signing_key,
             msg,
+            send_message_options,
         )
         .await
     }
@@ -80,7 +87,7 @@ impl QueueClient {
     /// Non-destructively read a message
     ///
     /// * `timeout` : Sets the maximum duration for the HTTP connection when receiving a message.
-    /// If no message is received within this time, an empty 204 HTTP response will be returned.
+    ///   If no message is received within this time, an empty 204 HTTP response will be returned.
     ///
     /// Note: This function does not return the delete location
     /// of the message, so, after reading, you will lose
@@ -107,7 +114,7 @@ impl QueueClient {
     /// Non-destructively read a message but track it
     ///
     /// * `timeout` : Sets the maximum duration for the HTTP connection when receiving a message.
-    /// If no message is received within this time, an empty 204 HTTP response will be returned.
+    ///   If no message is received within this time, an empty 204 HTTP response will be returned.
     ///
     /// Note: This function returns a `PeekLockResponse`
     /// that contains a helper `delete_message` function.
