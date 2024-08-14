@@ -1,3 +1,5 @@
+use std::io::{self, Write};
+
 use azure_core::Result;
 
 use azure_openai_inference::{AzureKeyCredential, AzureOpenAIClient};
@@ -37,6 +39,7 @@ async fn main() -> Result<()> {
                     choice.delta.as_ref().map(|d| {
                         d.content.as_ref().map(|c| {
                             print!("{}", c);
+                            io::stdout().flush();
                         });
                     });
                 }
@@ -45,8 +48,5 @@ async fn main() -> Result<()> {
         }
     }
 
-    // openai_client.stream_chat_completion_stdout_dump(&chat_completions_request.model,
-    //             AzureServiceVersion::V2023_12_01Preview,
-    //             &chat_completions_request).await;
     Ok(())
 }
