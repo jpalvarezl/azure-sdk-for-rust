@@ -17,6 +17,7 @@ pub fn new_reqwest_client() -> Arc<dyn HttpClient> {
     // See <https://github.com/hyperium/hyper/issues/2312> for more details.
     #[cfg(not(target_arch = "wasm32"))]
     let client = ::reqwest::ClientBuilder::new()
+        .connection_verbose(true)
         .pool_max_idle_per_host(0)
         .build()
         .expect("failed to build `reqwest` client");
@@ -43,6 +44,7 @@ impl HttpClient for ::reqwest::Client {
         let body = request.body().clone();
 
         let reqwest_request = match body {
+            Body::Multipart(form) => req.multipart(super::to_reqwest_form(form)).build(),
             Body::Bytes(bytes) => req.body(bytes).build(),
 
             // We cannot currently implement `Body::SeekableStream` for WASM

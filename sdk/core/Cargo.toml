@@ -23,7 +23,7 @@ http-types = { version = "2.12", default-features = false }
 tracing = "0.1.40"
 rand = "0.8"
 reqwest = { version = "0.12.0", features = [
-  "stream",
+  "stream", "multipart"
 ], default-features = false, optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -57,6 +57,7 @@ default = []
 enable_reqwest = ["reqwest/default-tls"]
 enable_reqwest_gzip = ["reqwest/gzip"]
 enable_reqwest_rustls = ["reqwest/rustls-tls"]
+enable_reqwest_multipart = ["reqwest/multipart"]
 hmac_rust = ["dep:sha2", "dep:hmac"]
 hmac_openssl = ["dep:openssl"]
 test_e2e = []
