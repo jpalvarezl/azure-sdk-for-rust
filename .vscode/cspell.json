@@ -6,11 +6,13 @@
     "**/test-resources.bicep",
     "**/test-resources.json",
     ".devcontainer/devcontainer.json",
+    ".devcontainer/Dockerfile",
     ".devcontainer/oncreate",
     ".github/CODEOWNERS",
     ".github/dependabot.yml",
     ".vscode/cspell.json",
     ".vscode/extensions.json",
+    ".vscode/tasks.json",
     "NOTICE.txt",
     "eng/",
     "*.dict.txt",
@@ -21,6 +23,7 @@
     "asyncoperation",
     "azsdk",
     "azurecli",
+    "Contoso",
     "cplusplus",
     "datalake",
     "datetime",
@@ -29,6 +32,7 @@
     "downcasted",
     "downcasting",
     "entra",
+    "endregion",
     "etag",
     "eventhub",
     "eventhubs",
@@ -36,6 +40,7 @@
     "iothub",
     "keyvault",
     "msrc",
+    "openai",
     "pageable",
     "pkce",
     "pkcs",
@@ -62,6 +67,11 @@
     {
       "name": "cosmos",
       "path": "../sdk/cosmos/.dict.txt",
+      "noSuggest": true
+    },
+    {
+      "name": "identity",
+      "path": "../sdk/identity/.dict.txt",
       "noSuggest": true
     }
   ],
@@ -92,11 +102,10 @@
     },
     {
       "filename": "sdk/identity/**",
-      "words": [
-        "adfs",
-        "azureauth",
-        "msal",
-        "imds"
+      "dictionaries": [
+        "crates",
+        "rust-custom",
+        "identity"
       ]
     },
     {

@@ -35,9 +35,10 @@
 # ServiceOwner: @Pilchie
 # ServiceLabel: %Cosmos
 # PRLabel: %Cosmos
-/sdk/cosmos/          @analogrelay @Pilchie
+/sdk/cosmos/          @analogrelay @Pilchie @kirankumarkolli @tvaron3 @FabianMeiswinkel @kundadebdatta
 
 ###########
 # Eng Sys
 ###########
 /eng/                   @weshaggard @heaths @RickWinter
+/.github/CODEOWNERS      @RickWinter @ronniegeraghty @Azure/azure-sdk-eng

@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-use azure_core::auth::TokenCredential;
+use azure_core::credentials::TokenCredential;
 use azure_identity::AzureCliCredential;
 use std::error::Error;
 use url::Url;
@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let sub_id = AzureCliCredential::get_subscription().await?;
     println!("Azure cli subscription: {sub_id}");
 
-    let credentials = AzureCliCredential::new();
+    let credentials = AzureCliCredential::new()?;
     let res = credentials
         .get_token(&["https://management.azure.com/.default"])
         .await?;

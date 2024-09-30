@@ -16,7 +16,7 @@ use super::{
 use async_std::sync::Mutex;
 use async_stream::try_stream;
 use azure_core::{
-    auth::{AccessToken, TokenCredential},
+    credentials::{AccessToken, TokenCredential},
     error::{Error, Result},
     RetryOptions,
 };
@@ -45,7 +45,7 @@ pub struct ConsumerClient {
     session_instances: Mutex<HashMap<String, Arc<AmqpSession>>>,
     mgmt_client: Mutex<OnceLock<ManagementInstance>>,
     connection: OnceLock<AmqpConnection>,
-    credential: Box<dyn azure_core::auth::TokenCredential>,
+    credential: Arc<dyn azure_core::credentials::TokenCredential>,
     eventhub: String,
     url: String,
     authorization_scopes: Mutex<HashMap<String, AccessToken>>,
@@ -75,7 +75,7 @@ impl ConsumerClient {
     /// use azure_messaging_eventhubs::consumer::ConsumerClient;
     /// use azure_identity::{DefaultAzureCredential, TokenCredentialOptions};
     ///
-    ///     let my_credential = DefaultAzureCredential::create(TokenCredentialOptions::default()).unwrap();
+    ///     let my_credential = DefaultAzureCredential::new()?;
     /// let consumer = ConsumerClient::new("my_namespace", "my_eventhub", None, my_credential, None);
     /// # Ok(())}
     /// ```
@@ -84,7 +84,7 @@ impl ConsumerClient {
         fully_qualified_namespace: impl Into<String> + Debug,
         eventhub_name: impl Into<String> + Debug,
         consumer_group: Option<String>,
-        credential: impl TokenCredential + 'static,
+        credential: Arc<dyn TokenCredential>,
         options: Option<ConsumerClientOptions>,
     ) -> Self {
         let eventhub_name = eventhub_name.into();
@@ -100,7 +100,7 @@ impl ConsumerClient {
             session_instances: Mutex::new(HashMap::new()),
             mgmt_client: Mutex::new(OnceLock::new()),
             connection: OnceLock::new(),
-            credential: Box::new(credential),
+            credential,
             eventhub: eventhub_name,
             url,
             authorization_scopes: Mutex::new(HashMap::new()),
@@ -124,7 +124,7 @@ impl ConsumerClient {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let my_credential = DefaultAzureCredential::create(TokenCredentialOptions::default()).unwrap();
+    ///     let my_credential = DefaultAzureCredential::new().unwrap();
     ///     let consumer = ConsumerClient::new("my_namespace", "my_eventhub", None, my_credential, None);
     ///
     ///     let result = consumer.open().await;
@@ -166,7 +166,7 @@ impl ConsumerClient {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let my_credential = DefaultAzureCredential::create(TokenCredentialOptions::default()).unwrap();
+    ///     let my_credential = DefaultAzureCredential::new().unwrap();
     ///     let consumer = ConsumerClient::new("my_namespace", "my_eventhub", None, my_credential, None);
     ///
     ///     consumer.open().await.unwrap();
@@ -187,7 +187,11 @@ impl ConsumerClient {
     /// ```
     #[tracing::instrument]
     pub async fn close(self) -> Result<()> {
-        self.connection.get().unwrap().close().await?;
+        self.connection
+            .get()
+            .ok_or_else(|| azure_core::Error::from(ErrorKind::MissingConnection))?
+            .close()
+            .await?;
         Ok(())
     }
 
@@ -214,7 +218,7 @@ impl ConsumerClient {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let my_credential = DefaultAzureCredential::create(TokenCredentialOptions::default()).unwrap();
+    ///     let my_credential = DefaultAzureCredential::new().unwrap();
     ///     let consumer = ConsumerClient::new("my_namespace", "my_eventhub", None, my_credential, None);
     ///     let partition_id = "0";
     ///     let options = None;
@@ -315,7 +319,7 @@ impl ConsumerClient {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let my_credential = DefaultAzureCredential::create(TokenCredentialOptions::default()).unwrap();
+    ///     let my_credential = DefaultAzureCredential::new().unwrap();
     ///     let consumer = ConsumerClient::new("my_namespace", "my_eventhub", None, my_credential, None);
     ///
     ///     let eventhub_properties = consumer.get_eventhub_properties().await;
@@ -340,7 +344,7 @@ impl ConsumerClient {
             .lock()
             .await
             .get()
-            .unwrap()
+            .ok_or_else(|| azure_core::Error::from(ErrorKind::MissingManagementClient))?
             .get_eventhub_properties(&self.eventhub)
             .await
     }
@@ -366,7 +370,7 @@ impl ConsumerClient {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let my_credential = DefaultAzureCredential::create(TokenCredentialOptions::default()).unwrap();
+    ///     let my_credential = DefaultAzureCredential::new().unwrap();
     ///     let consumer = ConsumerClient::new("my_namespace", "my_eventhub", None, my_credential, None);
     ///     let partition_id = "0";
     ///
@@ -398,7 +402,7 @@ impl ConsumerClient {
             .lock()
             .await
             .get()
-            .unwrap()
+            .ok_or_else(|| azure_core::Error::from(ErrorKind::MissingManagementClient))?
             .get_eventhub_partition_properties(&self.eventhub, partition_id)
             .await
     }
@@ -430,11 +434,11 @@ impl ConsumerClient {
 
         trace!("Create management client.");
         let management =
-            AmqpManagement::new(session, "eventhubs_consumer_management", access_token);
+            AmqpManagement::new(session, "eventhubs_consumer_management", access_token)?;
         management.attach().await?;
         mgmt_client
             .set(ManagementInstance::new(management))
-            .unwrap();
+            .map_err(|_| azure_core::Error::from(ErrorKind::MissingManagementClient))?;
         trace!("Management client created.");
         Ok(())
     }
@@ -463,7 +467,9 @@ impl ConsumerClient {
                     ),
                 )
                 .await?;
-            self.connection.set(connection).unwrap();
+            self.connection
+                .set(connection)
+                .map_err(|_| azure_core::Error::from(ErrorKind::MissingManagementClient))?
         }
         Ok(())
     }
@@ -476,13 +482,16 @@ impl ConsumerClient {
             return Err(ErrorKind::MissingConnection.into());
         }
         if !scopes.contains_key(url.as_str()) {
-            let connection = self.connection.get().unwrap();
+            let connection = self
+                .connection
+                .get()
+                .ok_or_else(|| azure_core::Error::from(ErrorKind::MissingConnection))?;
 
             // Create an ephemeral session to host the authentication.
             let session = AmqpSession::new();
             session.begin(connection, None).await?;
 
-            let cbs = AmqpClaimsBasedSecurity::new(session);
+            let cbs = AmqpClaimsBasedSecurity::new(session)?;
             cbs.attach().await?;
 
             debug!("Get Token.");
@@ -494,21 +503,32 @@ impl ConsumerClient {
             let expires_at = token.expires_on;
             cbs.authorize_path(&url, token.token.secret(), expires_at)
                 .await?;
-            scopes.insert(url.clone(), token);
+            scopes.insert(url.clone(), token).ok_or_else(|| {
+                azure_core::Error::from(ErrorKind::UnableToAddAuthenticationToken)
+            })?;
         }
-        Ok(scopes.get(url.as_str()).unwrap().clone())
+        Ok(scopes
+            .get(url.as_str())
+            .ok_or_else(|| azure_core::Error::from(ErrorKind::UnableToAddAuthenticationToken))?
+            .clone())
     }
 
     async fn get_session(&self, partition_id: &String) -> Result<Arc<AmqpSession>> {
         let mut session_instances = self.session_instances.lock().await;
         if !session_instances.contains_key(partition_id) {
             debug!("Creating session for partition: {:?}", partition_id);
-            let connection = self.connection.get().unwrap();
+            let connection = self
+                .connection
+                .get()
+                .ok_or_else(|| azure_core::Error::from(ErrorKind::MissingConnection))?;
             let session = AmqpSession::new();
             session.begin(connection, None).await?;
             session_instances.insert(partition_id.clone(), Arc::new(session));
         }
-        let rv = session_instances.get(partition_id).unwrap().clone();
+        let rv = session_instances
+            .get(partition_id)
+            .ok_or_else(|| azure_core::Error::from(ErrorKind::MissingSession))?
+            .clone();
         debug!("Cloning session for partition {:?}: {:?}", partition_id, rv);
         Ok(rv)
     }
